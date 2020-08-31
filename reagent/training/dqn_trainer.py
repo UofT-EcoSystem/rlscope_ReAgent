@@ -126,6 +126,11 @@ class DQNTrainer(DQNTrainerBase):
     #  its type `no_grad` is not callable.
     @torch.no_grad()
     def train(self, training_batch: rlt.DiscreteDqnInput):
+
+        # IML: This DOES get called.
+        # logger.info("CALL: DQNTrainer.train")
+        # import pdb; pdb.set_trace()
+
         assert isinstance(training_batch, rlt.DiscreteDqnInput)
         boosted_rewards = self.boost_rewards(
             training_batch.reward, training_batch.action

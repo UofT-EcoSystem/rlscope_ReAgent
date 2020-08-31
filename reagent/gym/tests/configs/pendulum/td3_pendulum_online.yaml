@@ -43,4 +43,4 @@ num_train_episodes: 40
 num_eval_episodes: 20
 # Though maximal score is 0, we set lower bar to let tests finish in time
 passing_score_bar: -750
-use_gpu: false
+use_gpu: true

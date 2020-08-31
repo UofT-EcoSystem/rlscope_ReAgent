@@ -34,4 +34,4 @@ train_after_ts: 5000
 num_train_episodes: 50
 num_eval_episodes: 20
 passing_score_bar: 100.0
-use_gpu: false
+use_gpu: true

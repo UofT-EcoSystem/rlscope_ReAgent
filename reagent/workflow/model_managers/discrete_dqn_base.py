@@ -158,6 +158,11 @@ class DiscreteDQNBase(ModelManager):
         The field that should not be filled are:
         - output_path
         """
+
+        # IML: Never called?
+        # logger.info("CALL: DiscreteDQNBase.train")
+        # print("PRINT: CALL: DiscreteDQNBase.train")
+
         reporter = DiscreteDQNReporter(
             self.trainer_param.actions,
             target_action_distribution=self.target_action_distribution,
