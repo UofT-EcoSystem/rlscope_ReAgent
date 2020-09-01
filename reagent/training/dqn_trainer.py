@@ -14,6 +14,7 @@ from reagent.parameters import EvaluationParameters, RLParameters
 from reagent.training.dqn_trainer_base import DQNTrainerBase
 from reagent.training.imitator_training import get_valid_actions_from_imitator
 
+from iml_profiler.profiler import log_stacktrace
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +131,8 @@ class DQNTrainer(DQNTrainerBase):
         # IML: This DOES get called.
         # logger.info("CALL: DQNTrainer.train")
         # import pdb; pdb.set_trace()
+
+        # log_stacktrace.log_stacktraces()
 
         assert isinstance(training_batch, rlt.DiscreteDqnInput)
         boosted_rewards = self.boost_rewards(

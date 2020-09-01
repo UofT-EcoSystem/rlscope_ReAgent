@@ -16,6 +16,8 @@ from reagent.gym.envs.env_wrapper import EnvWrapper
 from reagent.gym.types import Trajectory, Transition
 from reagent.tensorboardX import SummaryWriterContext
 
+import iml_profiler.api as iml
+from reagent.training import rlscope_common
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +36,10 @@ def run_episode(
     terminal = False
     num_steps = 0
     while not terminal:
-        action, log_prob = agent.act(obs, possible_actions_mask)
-        next_obs, reward, terminal, _ = env.step(action)
+        with rlscope_common.iml_prof_operation('sample_action'):
+            action, log_prob = agent.act(obs, possible_actions_mask)
+        with rlscope_common.iml_prof_operation('step'):
+            next_obs, reward, terminal, _ = env.step(action)
         next_possible_actions_mask = env.possible_actions_mask
         if max_steps is not None and num_steps >= max_steps:
             terminal = True

@@ -15,6 +15,8 @@ from reagent.gym.types import PostStep, Transition
 from reagent.replay_memory.circular_replay_buffer import ReplayBuffer
 from reagent.training.trainer import Trainer
 
+import iml_profiler.api as iml
+from reagent.training import rlscope_common
 
 logger = logging.getLogger(__name__)
 
@@ -71,10 +73,11 @@ def train_with_replay_buffer_post_step(
         replay_buffer_inserter(replay_buffer, transition)
 
         if _num_steps % training_freq == 0:
-            assert replay_buffer.size >= batch_size
-            train_batch = replay_buffer.sample_transition_batch(batch_size=batch_size)
-            preprocessed_batch = trainer_preprocessor(train_batch)
-            trainer.train(preprocessed_batch)
+            with rlscope_common.iml_prof_operation('train_step'):
+                assert replay_buffer.size >= batch_size
+                train_batch = replay_buffer.sample_transition_batch(batch_size=batch_size)
+                preprocessed_batch = trainer_preprocessor(train_batch)
+                trainer.train(preprocessed_batch)
         _num_steps += 1
         return
 

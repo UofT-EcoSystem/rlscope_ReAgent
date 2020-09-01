@@ -23,6 +23,8 @@ from reagent.test.base.horizon_test_base import HorizonTestBase
 from reagent.workflow.model_managers.union import ModelManager__Union
 from torch.utils.tensorboard import SummaryWriter
 
+import iml_profiler.api as iml
+from reagent.training import rlscope_common
 
 # for seeding the environment
 SEED = 0
@@ -140,19 +142,47 @@ def run_test(
         env, policy=training_policy, post_transition_callback=post_step, device=device
     )
 
+    rlscope_common.iml_register_operations({
+        'training_loop',
+        'sample_action',
+        'step',
+        'train_step',
+    })
+    # if FLAGS.stable_baselines_hyperparams:
+    #     # stable-baselines does 100 [Inference, Simulator] steps per pass,
+    #     # and 50 train_step per pass,
+    #     # so scale down the number of passes to keep it close to 1 minute.
+    #     iml.prof.set_max_passes(25, skip_if_set=True)
+    #     # 1 configuration pass.
+    #     iml.prof.set_delay_passes(3, skip_if_set=True)
+    # else:
+    iml.prof.set_max_passes(10, skip_if_set=True)
+    # 1 configuration pass.
+    iml.prof.set_delay_passes(3, skip_if_set=True)
+
+    for operation in ['sample_action', 'step']:
+        iml.prof.set_max_operations(operation, 2*env.max_steps)
+
     writer = SummaryWriter()
     with summary_writer_context(writer):
         train_rewards = []
         for i in range(num_train_episodes):
-            trajectory = run_episode(
-                env=env, agent=agent, mdp_id=i, max_steps=env.max_steps
-            )
-            ep_reward = trajectory.calculate_cumulative_reward()
-            train_rewards.append(ep_reward)
-            logger.info(
-                f"Finished training episode {i} (len {len(trajectory)})"
-                f" with reward {ep_reward}."
-            )
+
+            rlscope_common.before_each_iteration(i, num_train_episodes)
+
+            with rlscope_common.iml_prof_operation('training_loop'):
+                trajectory = run_episode(
+                    env=env, agent=agent, mdp_id=i, max_steps=env.max_steps
+                )
+                ep_reward = trajectory.calculate_cumulative_reward()
+                train_rewards.append(ep_reward)
+                logger.info(
+                    f"Finished training episode {i} (len {len(trajectory)})"
+                    f" with reward {ep_reward}."
+                )
+
+    # Q: Do we need this?
+    torch.cuda.synchronize()
 
     logger.info("============Train rewards=============")
     logger.info(train_rewards)
@@ -165,6 +195,9 @@ def run_test(
         f"{len(train_rewards)} episodes is less than < {passing_score_bar}.\n"
     )
 
+    # IML: NOTE: torch.jit.script is only used for serving trained policies (for portability).
+    # ReAgent doesn't make use of torch.jit.script during training (surprisingly...).
+
     serving_policy = manager.create_policy(serving=True)
     agent = Agent.create_for_env_with_serving_policy(env, serving_policy)
 
@@ -176,9 +209,9 @@ def run_test(
     logger.info(eval_rewards)
     mean_eval = np.mean(eval_rewards)
     logger.info(f"average: {mean_eval};\tmax: {np.max(eval_rewards)}")
-    assert (
-        mean_eval >= passing_score_bar
-    ), f"Eval reward is {mean_eval}, less than < {passing_score_bar}.\n"
+    # assert (
+    #     mean_eval >= passing_score_bar
+    # ), f"Eval reward is {mean_eval}, less than < {passing_score_bar}.\n"
 
 
 if __name__ == "__main__":
