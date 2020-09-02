@@ -196,6 +196,7 @@ class TD3Trainer(RLTrainer):
         self.loss_reporter.report(
             td_loss=float(q1_loss),
             reward_loss=None,
+            # reward.shape == torch.Size([batch_size, 1])
             logged_rewards=reward,
             model_values_on_logged_actions=q1_value,
         )

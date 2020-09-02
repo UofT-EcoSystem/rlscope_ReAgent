@@ -225,6 +225,8 @@ class LossReporter(object):
             logger.info("Nothing to report")
             return
 
+        # IML: NOTE: this is reported on the last loss_report_interval=100 minibatches used for gradient updates.
+        # So, it gets called every 100 gradient updates, and "100" has no relation to the batch_size.
         logger.info("Loss on {} batches".format(len(self.incoming_stats)))
 
         batch_stats = merge_tensor_namedtuple_list(self.incoming_stats, BatchStats)

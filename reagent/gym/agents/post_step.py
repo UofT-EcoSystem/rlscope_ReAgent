@@ -81,6 +81,7 @@ def train_with_replay_buffer_post_step(
             # NOTE: the original TD3 paper (https://arxiv.org/pdf/1802.09477.pdf) does not
             # mention this hyperparameter nor have it in its pseudocode, but using it ensures
             # an "apples-to-apples" comparison of the frameworks.
+            # logger.info(f"TRAIN: num_steps % training_freq = 0, num_steps={_num_steps}, training_freq={training_freq}")
             for gradient_step in range(gradient_steps):
                 with rlscope_common.iml_prof_operation('train_step'):
                     assert replay_buffer.size >= batch_size
