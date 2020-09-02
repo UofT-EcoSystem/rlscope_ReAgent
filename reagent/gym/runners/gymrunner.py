@@ -67,56 +67,6 @@ def run_episode(
         num_steps += 1
     return trajectory
 
-# IML: TODO: add reset_every_episode parameter to "re-use" env without resetting it when running with stable-baselines hyperparameters
-def run_step(
-    env: EnvWrapper, agent: Agent,
-    obs,
-    trajectory : Trajectory,
-    mdp_id: int = 0,
-) -> Trajectory:
-    # IML: TODO: add reset_every_episode parameter to "re-use" env without resetting it when running with stable-baselines hyperparameters
-    """
-    Return sum of rewards from episode.
-    After max_steps (if specified), the environment is assumed to be terminal.
-    Can also specify the mdp_id and gamma of episode.
-    """
-    assert obs is not None
-    assert trajectory is not None
-
-    possible_actions_mask = env.possible_actions_mask
-    terminal = False
-    done = False
-    num_steps = len(trajectory)
-
-    with rlscope_common.iml_prof_operation('sample_action'):
-        action, log_prob = agent.act(obs, possible_actions_mask)
-    with rlscope_common.iml_prof_operation('step'):
-        next_obs, reward, terminal, _ = env.step(action)
-    done = terminal
-    next_possible_actions_mask = env.possible_actions_mask
-    # if max_steps is not None and num_steps >= max_steps:
-    #     terminal = True
-
-    # Only partially filled. Agent can fill in more fields.
-    transition = Transition(
-        mdp_id=mdp_id,
-        sequence_number=num_steps,
-        observation=obs,
-        action=action,
-        reward=float(reward),
-        terminal=bool(terminal),
-        log_prob=log_prob,
-        possible_actions_mask=possible_actions_mask,
-    )
-    agent.post_step(transition)
-    trajectory.add_transition(transition)
-    SummaryWriterContext.increase_global_step()
-    obs = next_obs
-    possible_actions_mask = next_possible_actions_mask
-    # num_steps += 1
-
-    return obs, done
-
 
 def evaluate_for_n_episodes(
     n: int,

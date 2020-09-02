@@ -105,7 +105,6 @@ def run_test(
     num_eval_episodes: int,
     use_gpu: bool,
     gradient_steps: int = 1,
-    # reset_every_episode: bool = True,
     log_dir: str = None,
 ):
     env = env.value
@@ -172,25 +171,11 @@ def run_test(
         # NOTE: initialization fills up the replay-buffer with experience, so training begins immediately.
         return True
 
-    # obs = None
-    # if not reset_every_episode:
-    #     obs = env.reset()
-    #     trajectory = Trajectory()
-
     logger.info(f"> env.max_steps = {env.max_steps}")
-    # logger.info(f"> reset_every_episode = {reset_every_episode}")
-
-    train_rewards = []
-    def log_trajectory(trajectory):
-        ep_reward = trajectory.calculate_cumulative_reward()
-        train_rewards.append(ep_reward)
-        logger.info(
-            f"Finished training episode {i} (len {len(trajectory)})"
-            f" with reward {ep_reward}."
-        )
 
     writer = SummaryWriter(log_dir=log_dir)
     with summary_writer_context(writer):
+        train_rewards = []
         for i in range(num_train_episodes):
 
             rlscope_common.before_each_iteration(
@@ -207,29 +192,6 @@ def run_test(
                     f"Finished training episode {i} (len {len(trajectory)})"
                     f" with reward {ep_reward}."
                 )
-
-                # if reset_every_episode:
-                #     trajectory = run_episode(
-                #         env=env, agent=agent, mdp_id=i, max_steps=env.max_steps
-                #     )
-                #     log_trajectory(trajectory)
-                # else:
-                #     # IML: Match the implementations from stable-baselines and tf-agents, whose implementations
-                #     # are closer to the original pseudocode for TD3 found in the original paper
-                #     # (https://arxiv.org/pdf/1802.09477.pdf). In particular, ReAgent collects
-                #     # entire episodes of experience before applying any gradient updates,
-                #     # whereas the pseudocode will update the critic after every transition,
-                #     # and update the policy and target networks after "d" transitions (policy delay).
-                #     obs, done = run_step(
-                #         env=env, agent=agent,
-                #         obs=obs,
-                #         trajectory=trajectory,
-                #         mdp_id=i,
-                #     )
-                #     if done:
-                #         log_trajectory(trajectory)
-                #         trajectory = Trajectory()
-                #         obs = env.reset()
 
     logger.info("============Train rewards=============")
     logger.info(train_rewards)
@@ -256,6 +218,7 @@ def run_test(
     logger.info(eval_rewards)
     mean_eval = np.mean(eval_rewards)
     logger.info(f"average: {mean_eval};\tmax: {np.max(eval_rewards)}")
+    # IML: Skip this for now.
     # assert (
     #     mean_eval >= passing_score_bar
     # ), f"Eval reward is {mean_eval}, less than < {passing_score_bar}.\n"
