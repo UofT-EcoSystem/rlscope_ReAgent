@@ -3,7 +3,7 @@ import textwrap
 import iml_profiler.api as iml
 from reagent.training import rlscope_common
 
-def before_each_iteration(iteration, num_iterations):
+def before_each_iteration(iteration, num_iterations, is_warmed_up=None):
   if iml.prof.delay and iml_is_warmed_up() and not iml.prof.tracing_enabled:
     # Entire training loop is now running; enable IML tracing
     iml.prof.enable_tracing()
@@ -11,21 +11,31 @@ def before_each_iteration(iteration, num_iterations):
   # GOAL: we only want to call report_progress once we've seen ALL the operations run
   # (i.e., q_backward, q_update_target_network).  This will ensure that the GPU HW sampler
   # will see ALL the possible GPU operations.
+  waiting_for = OPERATIONS_AVAILABLE.difference(OPERATIONS_SEEN)
   if iml.prof.debug:
     iml.logger.info(textwrap.dedent("""\
         RLS: @ t={iteration}: OPERATIONS_SEEN = {OPERATIONS_SEEN}
           waiting for = {waiting_for}
+          is_warmed_up = {is_warmed_up}
         """.format(
       iteration=iteration,
       OPERATIONS_SEEN=OPERATIONS_SEEN,
-      waiting_for=OPERATIONS_AVAILABLE.difference(OPERATIONS_SEEN),
+      waiting_for=waiting_for,
+      is_warmed_up=is_warmed_up,
     )).rstrip())
-  if OPERATIONS_SEEN == OPERATIONS_AVAILABLE:
+  if len(waiting_for) == 0 and ( is_warmed_up is None or is_warmed_up ):
     OPERATIONS_SEEN.clear()
     iml.prof.report_progress(
       percent_complete=iteration/float(num_iterations),
       num_timesteps=iteration,
       total_timesteps=num_iterations)
+    if iml.prof.tracing_enabled:
+      iml.logger.info(textwrap.dedent("""\
+        RLS: @ t={iteration}: PASS {pass_idx}
+        """.format(
+        pass_idx=iml.prof.pass_idx,
+        iteration=iteration,
+      )).rstrip())
 
     # if FLAGS.log_stacktrace_freq is not None and iteration % FLAGS.log_stacktrace_freq == 0:
     #   log_stacktraces()

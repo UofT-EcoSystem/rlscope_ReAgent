@@ -43,6 +43,7 @@ def train_with_replay_buffer_post_step(
     trainer: Trainer,
     training_freq: int,
     batch_size: int,
+    gradient_steps: int,
     trainer_preprocessor=None,
     device: Union[str, torch.device] = "cpu",
     replay_buffer_inserter=None,
@@ -73,11 +74,19 @@ def train_with_replay_buffer_post_step(
         replay_buffer_inserter(replay_buffer, transition)
 
         if _num_steps % training_freq == 0:
-            with rlscope_common.iml_prof_operation('train_step'):
-                assert replay_buffer.size >= batch_size
-                train_batch = replay_buffer.sample_transition_batch(batch_size=batch_size)
-                preprocessed_batch = trainer_preprocessor(train_batch)
-                trainer.train(preprocessed_batch)
+            # IML: add gradient_steps hyperparameter to perform multiple gradient updates per step.
+            # This matches the behaviour of stable-baselines (gradient_steps) and
+            # tf-agents (train_steps_per_iteration) hyperparameters.
+            #
+            # NOTE: the original TD3 paper (https://arxiv.org/pdf/1802.09477.pdf) does not
+            # mention this hyperparameter nor have it in its pseudocode, but using it ensures
+            # an "apples-to-apples" comparison of the frameworks.
+            for gradient_step in range(gradient_steps):
+                with rlscope_common.iml_prof_operation('train_step'):
+                    assert replay_buffer.size >= batch_size
+                    train_batch = replay_buffer.sample_transition_batch(batch_size=batch_size)
+                    preprocessed_batch = trainer_preprocessor(train_batch)
+                    trainer.train(preprocessed_batch)
         _num_steps += 1
         return
 

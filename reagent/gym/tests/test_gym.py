@@ -15,13 +15,14 @@ from reagent.core.types import RewardOptions
 from reagent.gym.agents.agent import Agent
 from reagent.gym.agents.post_step import train_with_replay_buffer_post_step
 from reagent.gym.envs.union import Env__Union
-from reagent.gym.runners.gymrunner import evaluate_for_n_episodes, run_episode
+from reagent.gym.runners.gymrunner import evaluate_for_n_episodes, run_episode, run_step
 from reagent.gym.utils import build_normalizer, fill_replay_buffer
 from reagent.replay_memory.circular_replay_buffer import ReplayBuffer
 from reagent.tensorboardX import summary_writer_context
 from reagent.test.base.horizon_test_base import HorizonTestBase
 from reagent.workflow.model_managers.union import ModelManager__Union
 from torch.utils.tensorboard import SummaryWriter
+from reagent.gym.types import Trajectory, Transition
 
 import iml_profiler.api as iml
 from reagent.training import rlscope_common
@@ -103,6 +104,9 @@ def run_test(
     passing_score_bar: float,
     num_eval_episodes: int,
     use_gpu: bool,
+    gradient_steps: int = 1,
+    # reset_every_episode: bool = True,
+    log_dir: str = None,
 ):
     env = env.value
     env.seed(SEED)
@@ -135,6 +139,7 @@ def run_test(
         trainer=trainer,
         training_freq=train_every_ts,
         batch_size=trainer.minibatch_size,
+        gradient_steps=gradient_steps,
         device=device,
     )
 
@@ -163,12 +168,34 @@ def run_test(
     for operation in ['sample_action', 'step']:
         iml.prof.set_max_operations(operation, 2*env.max_steps)
 
-    writer = SummaryWriter()
+    def is_warmed_up(i):
+        # NOTE: initialization fills up the replay-buffer with experience, so training begins immediately.
+        return True
+
+    # obs = None
+    # if not reset_every_episode:
+    #     obs = env.reset()
+    #     trajectory = Trajectory()
+
+    logger.info(f"> env.max_steps = {env.max_steps}")
+    # logger.info(f"> reset_every_episode = {reset_every_episode}")
+
+    train_rewards = []
+    def log_trajectory(trajectory):
+        ep_reward = trajectory.calculate_cumulative_reward()
+        train_rewards.append(ep_reward)
+        logger.info(
+            f"Finished training episode {i} (len {len(trajectory)})"
+            f" with reward {ep_reward}."
+        )
+
+    writer = SummaryWriter(log_dir=log_dir)
     with summary_writer_context(writer):
-        train_rewards = []
         for i in range(num_train_episodes):
 
-            rlscope_common.before_each_iteration(i, num_train_episodes)
+            rlscope_common.before_each_iteration(
+                i, num_train_episodes,
+                is_warmed_up=is_warmed_up(i))
 
             with rlscope_common.iml_prof_operation('training_loop'):
                 trajectory = run_episode(
@@ -181,8 +208,28 @@ def run_test(
                     f" with reward {ep_reward}."
                 )
 
-    # Q: Do we need this?
-    torch.cuda.synchronize()
+                # if reset_every_episode:
+                #     trajectory = run_episode(
+                #         env=env, agent=agent, mdp_id=i, max_steps=env.max_steps
+                #     )
+                #     log_trajectory(trajectory)
+                # else:
+                #     # IML: Match the implementations from stable-baselines and tf-agents, whose implementations
+                #     # are closer to the original pseudocode for TD3 found in the original paper
+                #     # (https://arxiv.org/pdf/1802.09477.pdf). In particular, ReAgent collects
+                #     # entire episodes of experience before applying any gradient updates,
+                #     # whereas the pseudocode will update the critic after every transition,
+                #     # and update the policy and target networks after "d" transitions (policy delay).
+                #     obs, done = run_step(
+                #         env=env, agent=agent,
+                #         obs=obs,
+                #         trajectory=trajectory,
+                #         mdp_id=i,
+                #     )
+                #     if done:
+                #         log_trajectory(trajectory)
+                #         trajectory = Trajectory()
+                #         obs = env.reset()
 
     logger.info("============Train rewards=============")
     logger.info(train_rewards)

@@ -8,6 +8,7 @@ import logging
 import os
 import sys
 import re
+import textwrap
 
 import pprint
 import inspect
@@ -16,6 +17,8 @@ import click
 from ruamel.yaml import YAML
 
 import iml_profiler.api as iml
+
+from reagent.training import rlscope_hyperparams
 
 @click.group()
 def reagent():
@@ -123,6 +126,7 @@ def run(workflow, config_file, **kwargs):
     config_dict = yaml.load(config_file.read())
     assert config_dict is not None, "failed to read yaml file"
     config_dict = select_relevant_params(config_dict, ConfigClass)
+    # NOTE: This is when the algorithm gets instantiated.
     config = ConfigClass(**config_dict)
 
     # Wrap AFTER @torch.jit.script runs to avoid messing up jit compiling
@@ -150,6 +154,42 @@ def run(workflow, config_file, **kwargs):
     })
     process_name = f'{algo}_run'
     phase_name = process_name
+
+    with iml.prof.profile(process_name=process_name, phase_name=phase_name):
+        func(**config.asdict())
+
+
+@reagent.command(short_help="Run the workflow with stable-baselines/rl-baselines-zoo pre-tuned hyperparameters")
+@click.argument("workflow")
+@click.option("--algo", required=True)
+@click.option("--env", required=True)
+@iml.click_add_arguments()
+def run_stable_baselines(workflow, algo, env, **kwargs):
+
+    config_dict = rlscope_hyperparams.load_stable_baselines_hyperparams(algo, env)
+
+    func, ConfigClass = _load_func_and_config_class(workflow)
+
+    iml.handle_click_iml_args(kwargs, directory=kwargs['iml_directory'], reports_progress=True)
+    iml.prof.set_metadata({
+        'algo': algo,
+        'env': env,
+    })
+    process_name = f'{algo}_run'
+    phase_name = process_name
+
+    config_dict = select_relevant_params(config_dict, ConfigClass)
+    config_dict['log_dir'] = os.path.join(kwargs['iml_directory'], 'tensorboard_log_dir')
+    logging.info("config:\n{msg}".format(msg=textwrap.indent(pprint.pformat(config_dict), prefix='  ')))
+
+    # NOTE: This is when the algorithm gets instantiated.
+    config = ConfigClass(**config_dict)
+
+    # Wrap AFTER @torch.jit.script runs to avoid messing up jit compiling
+    # (I think wrapping torch.* messes up the type annotation information?)
+    # wrap_pytorch()
+    from iml_profiler.profiler import clib_wrap as iml_clib_wrap
+    iml_clib_wrap.register_torch()
 
     with iml.prof.profile(process_name=process_name, phase_name=phase_name):
         func(**config.asdict())

@@ -15,6 +15,8 @@ from reagent.training.rl_trainer_pytorch import RLTrainer
 
 logger = logging.getLogger(__name__)
 
+import iml_profiler.api as iml
+from reagent.training import rlscope_common
 
 class TD3Trainer(RLTrainer):
     """
@@ -97,6 +99,17 @@ class TD3Trainer(RLTrainer):
         assert isinstance(training_batch, rlt.PolicyNetworkInput)
 
         self.minibatch += 1
+
+        # IML: NOTE: We could use more fine-grained annotations, but for now lets use
+        # coarse-grained ones to make post-processing easier when comparing across
+        # RL frameworks.
+        #
+        # update_policy = (self.minibatch % self.delayed_policy_update == 0)
+        # if update_policy:
+        #     operation = 'train_actor_and_critic'
+        # else:
+        #     operation = 'train_critic'
+        # with rlscope_common.iml_prof_operation(operation):
 
         state = training_batch.state
         action = training_batch.action
