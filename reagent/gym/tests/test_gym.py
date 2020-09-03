@@ -152,17 +152,10 @@ def run_test(
         'step',
         'train_step',
     })
-    # if FLAGS.stable_baselines_hyperparams:
-    #     # stable-baselines does 100 [Inference, Simulator] steps per pass,
-    #     # and 50 train_step per pass,
-    #     # so scale down the number of passes to keep it close to 1 minute.
-    #     iml.prof.set_max_passes(25, skip_if_set=True)
-    #     # 1 configuration pass.
-    #     iml.prof.set_delay_passes(3, skip_if_set=True)
-    # else:
-    iml.prof.set_max_passes(10, skip_if_set=True)
+    # IML: Takes around 3 minutes to run with stable-baselines hyperparams
+    iml.prof.set_max_passes(5, skip_if_set=True)
     # 1 configuration pass.
-    iml.prof.set_delay_passes(3, skip_if_set=True)
+    iml.prof.set_delay_passes(1, skip_if_set=True)
 
     for operation in ['sample_action', 'step']:
         iml.prof.set_max_operations(operation, 2*env.max_steps)
