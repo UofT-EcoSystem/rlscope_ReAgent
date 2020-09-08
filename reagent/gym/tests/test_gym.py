@@ -4,6 +4,8 @@ import logging
 import os
 import pprint
 import unittest
+import time
+from typing import Optional
 
 import numpy as np
 
@@ -100,13 +102,23 @@ def run_test(
     replay_memory_size: int,
     train_every_ts: int,
     train_after_ts: int,
-    num_train_episodes: int,
     passing_score_bar: float,
     num_eval_episodes: int,
     use_gpu: bool,
     gradient_steps: int = 1,
     log_dir: str = None,
+    num_train_episodes: Optional[int] = None,
+    num_simulator_steps: Optional[int] = None,
 ):
+    # Provide at least one
+    assert num_train_episodes is not None or num_simulator_steps is not None
+    # Only provide one or the other
+    assert not ( num_train_episodes is not None and num_simulator_steps is not None )
+    if num_train_episodes is not None:
+        logger.info(f"> Train for num_train_episodes={num_train_episodes} episodes")
+    if num_simulator_steps is not None:
+        logger.info(f"> Train for num_simulator_steps={num_simulator_steps} simulator steps")
+
     env = env.value
     env.seed(SEED)
     env.action_space.seed(SEED)
@@ -142,6 +154,9 @@ def run_test(
         device=device,
     )
 
+    def train_step_counter():
+        return trainer.minibatch
+
     agent = Agent.create_for_env(
         env, policy=training_policy, post_transition_callback=post_step, device=device
     )
@@ -151,6 +166,7 @@ def run_test(
         'sample_action',
         'step',
         'train_step',
+        'replay_buffer_add',
     })
     # IML: Takes around 3 minutes to run with stable-baselines hyperparams
     iml.prof.set_max_passes(5, skip_if_set=True)
@@ -160,31 +176,60 @@ def run_test(
     for operation in ['sample_action', 'step']:
         iml.prof.set_max_operations(operation, 2*env.max_steps)
 
-    def is_warmed_up(i):
-        # NOTE: initialization fills up the replay-buffer with experience, so training begins immediately.
-        return True
+    # def is_warmed_up():
+    #     # NOTE: initialization fills up the replay-buffer with experience, so training begins immediately.
+    #     return True
 
     logger.info(f"> env.max_steps = {env.max_steps}")
 
+    start_train_step = train_step_counter()
+    assert start_train_step == 0
+    time_acc = 0.
     writer = SummaryWriter(log_dir=log_dir)
     with summary_writer_context(writer):
         train_rewards = []
-        for i in range(num_train_episodes):
+        if num_simulator_steps is not None:
+            total_steps = num_simulator_steps
+        else:
+            total_steps = num_train_episodes
+        # for i in range(total_steps):
+        step = 0
+        episode_i = 0
+        while step < total_steps:
 
             rlscope_common.before_each_iteration(
-                i, num_train_episodes,
-                is_warmed_up=is_warmed_up(i))
+                # i, num_train_episodes,
+                # num_steps, num_simulator_steps,
+                step, total_steps,
+            )
 
+            start_time = time.time()
             with rlscope_common.iml_prof_operation('training_loop'):
                 trajectory = run_episode(
-                    env=env, agent=agent, mdp_id=i, max_steps=env.max_steps
+                    env=env, agent=agent, mdp_id=episode_i, max_steps=env.max_steps
                 )
+                episode_i += 1
+                if num_simulator_steps is not None:
+                    # tf-agents / stable-baselines / TD3 paper pseudocode:
+                    # Count the number of episodes of experience we collect
+                    step += len(trajectory)
+                else:
+                    # ReAgent:
+                    # Count the number of episodes of experience we collect
+                    step += 1
                 ep_reward = trajectory.calculate_cumulative_reward()
                 train_rewards.append(ep_reward)
-                logger.info(
-                    f"Finished training episode {i} (len {len(trajectory)})"
-                    f" with reward {ep_reward}."
-                )
+            end_time = time.time()
+            cur_train_step = train_step_counter()
+            time_acc += end_time - start_time
+            # IML: Count the number of gradient updates steps per second
+            # (sanity check for comparing against other RL frameworks)
+            train_steps_per_sec = (cur_train_step - start_train_step) / time_acc
+            logger.info(
+                f"Finished training episode {episode_i} (len {len(trajectory)})"
+                f" with reward {ep_reward}.\n"
+                f"  @ {train_steps_per_sec:.3f} training steps/sec.\n"
+            )
 
     logger.info("============Train rewards=============")
     logger.info(train_rewards)

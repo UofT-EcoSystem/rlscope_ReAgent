@@ -40,7 +40,12 @@ def load_stable_baselines_hyperparams(algo, env_id, rl_baselines_zoo_dir=None):
     # reagent_params['num_train_episodes'] = ...
     # NOTE: match the behaviour of stable-baselines, where "n_timesteps" in the TD3 implementation refers
     # to the number of [Inference, Simulator] "steps" we perform, NOT the number of gradient updates (i..e, train_step calls).
-    reagent_params['num_train_episodes'] = int(zoo_params['hyperparams']['n_timesteps'])
+    # reagent_params['num_train_episodes'] = int(zoo_params['hyperparams']['n_timesteps'])
+    # reagent_params['num_train_episodes'] = None
+    # allow_none.add('num_train_episodes')
+
+    # Stable-baselines counts the initial transitions towards its total step count.
+    reagent_params['num_simulator_steps'] = int(zoo_params['hyperparams']['n_timesteps']) - model.learning_starts
     # reagent_params['num_train_episodes'] = int(zoo_params['hyperparams']['n_timesteps']) // model.train_freq
     reagent_params['replay_memory_size'] = model.buffer_size
     reagent_params['train_after_ts'] = model.learning_starts

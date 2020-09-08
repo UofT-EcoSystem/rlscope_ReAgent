@@ -71,7 +71,8 @@ def train_with_replay_buffer_post_step(
     def post_step(transition: Transition) -> None:
         nonlocal _num_steps
 
-        replay_buffer_inserter(replay_buffer, transition)
+        with rlscope_common.iml_prof_operation('replay_buffer_add'):
+            replay_buffer_inserter(replay_buffer, transition)
 
         if _num_steps % training_freq == 0:
             # IML: add gradient_steps hyperparameter to perform multiple gradient updates per step.
