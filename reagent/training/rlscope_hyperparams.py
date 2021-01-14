@@ -10,7 +10,7 @@ def load_stable_baselines_hyperparams(algo, env_id, rl_baselines_zoo_dir=None):
 
   Returns:
   """
-  from stable_baselines.iml.hyperparams import load_rl_baselines_zoo_hyperparams
+  from stable_baselines.rlscope.hyperparams import load_rl_baselines_zoo_hyperparams
 
   if rl_baselines_zoo_dir is None:
     rl_baselines_zoo_dir = os.getenv('RL_BASELINES_ZOO_DIR', None)

@@ -159,7 +159,7 @@ class DiscreteDQNBase(ModelManager):
         - output_path
         """
 
-        # IML: Never called?
+        # RL-Scope: Never called?
         # logger.info("CALL: DiscreteDQNBase.train")
         # print("PRINT: CALL: DiscreteDQNBase.train")
 

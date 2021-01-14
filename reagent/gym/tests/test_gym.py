@@ -26,7 +26,7 @@ from reagent.workflow.model_managers.union import ModelManager__Union
 from torch.utils.tensorboard import SummaryWriter
 from reagent.gym.types import Trajectory, Transition
 
-import iml_profiler.api as iml
+import rlscope.api as rlscope
 from reagent.training import rlscope_common
 
 # for seeding the environment
@@ -161,20 +161,20 @@ def run_test(
         env, policy=training_policy, post_transition_callback=post_step, device=device
     )
 
-    rlscope_common.iml_register_operations({
+    rlscope_common.rlscope_register_operations({
         'training_loop',
         'sample_action',
         'step',
         'train_step',
         'replay_buffer_add',
     })
-    # IML: Takes around 3 minutes to run with stable-baselines hyperparams
-    iml.prof.set_max_passes(5, skip_if_set=True)
+    # RL-Scope: Takes around 3 minutes to run with stable-baselines hyperparams
+    rlscope.prof.set_max_passes(5, skip_if_set=True)
     # 1 configuration pass.
-    iml.prof.set_delay_passes(1, skip_if_set=True)
+    rlscope.prof.set_delay_passes(1, skip_if_set=True)
 
     for operation in ['sample_action', 'step']:
-        iml.prof.set_max_operations(operation, 2*env.max_steps)
+        rlscope.prof.set_max_operations(operation, 2*env.max_steps)
 
     # def is_warmed_up():
     #     # NOTE: initialization fills up the replay-buffer with experience, so training begins immediately.
@@ -204,7 +204,7 @@ def run_test(
             )
 
             start_time = time.time()
-            with rlscope_common.iml_prof_operation('training_loop'):
+            with rlscope_common.rlscope_prof_operation('training_loop'):
                 trajectory = run_episode(
                     env=env, agent=agent, mdp_id=episode_i, max_steps=env.max_steps
                 )
@@ -222,7 +222,7 @@ def run_test(
             end_time = time.time()
             cur_train_step = train_step_counter()
             time_acc += end_time - start_time
-            # IML: Count the number of gradient updates steps per second
+            # RL-Scope: Count the number of gradient updates steps per second
             # (sanity check for comparing against other RL frameworks)
             train_steps_per_sec = (cur_train_step - start_train_step) / time_acc
             logger.info(
@@ -242,7 +242,7 @@ def run_test(
         f"{len(train_rewards)} episodes is less than < {passing_score_bar}.\n"
     )
 
-    # IML: NOTE: torch.jit.script is only used for serving trained policies (for portability).
+    # RL-Scope: NOTE: torch.jit.script is only used for serving trained policies (for portability).
     # ReAgent doesn't make use of torch.jit.script during training (surprisingly...).
 
     serving_policy = manager.create_policy(serving=True)
@@ -256,7 +256,7 @@ def run_test(
     logger.info(eval_rewards)
     mean_eval = np.mean(eval_rewards)
     logger.info(f"average: {mean_eval};\tmax: {np.max(eval_rewards)}")
-    # IML: Skip this for now.
+    # RL-Scope: Skip this for now.
     # assert (
     #     mean_eval >= passing_score_bar
     # ), f"Eval reward is {mean_eval}, less than < {passing_score_bar}.\n"

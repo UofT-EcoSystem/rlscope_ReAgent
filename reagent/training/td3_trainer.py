@@ -15,7 +15,7 @@ from reagent.training.rl_trainer_pytorch import RLTrainer
 
 logger = logging.getLogger(__name__)
 
-import iml_profiler.api as iml
+import rlscope.api as rlscope
 from reagent.training import rlscope_common
 
 class TD3Trainer(RLTrainer):
@@ -100,7 +100,7 @@ class TD3Trainer(RLTrainer):
 
         self.minibatch += 1
 
-        # IML: NOTE: We could use more fine-grained annotations, but for now lets use
+        # RL-Scope: NOTE: We could use more fine-grained annotations, but for now lets use
         # coarse-grained ones to make post-processing easier when comparing across
         # RL frameworks.
         #
@@ -109,7 +109,7 @@ class TD3Trainer(RLTrainer):
         #     operation = 'train_actor_and_critic'
         # else:
         #     operation = 'train_critic'
-        # with rlscope_common.iml_prof_operation(operation):
+        # with rlscope_common.rlscope_prof_operation(operation):
 
         state = training_batch.state
         action = training_batch.action

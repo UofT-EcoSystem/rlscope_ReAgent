@@ -15,7 +15,7 @@ from reagent.gym.types import PostStep, Transition
 from reagent.replay_memory.circular_replay_buffer import ReplayBuffer
 from reagent.training.trainer import Trainer
 
-import iml_profiler.api as iml
+import rlscope.api as rlscope
 from reagent.training import rlscope_common
 
 logger = logging.getLogger(__name__)
@@ -71,11 +71,11 @@ def train_with_replay_buffer_post_step(
     def post_step(transition: Transition) -> None:
         nonlocal _num_steps
 
-        with rlscope_common.iml_prof_operation('replay_buffer_add'):
+        with rlscope_common.rlscope_prof_operation('replay_buffer_add'):
             replay_buffer_inserter(replay_buffer, transition)
 
         if _num_steps % training_freq == 0:
-            # IML: add gradient_steps hyperparameter to perform multiple gradient updates per step.
+            # RL-Scope: add gradient_steps hyperparameter to perform multiple gradient updates per step.
             # This matches the behaviour of stable-baselines (gradient_steps) and
             # tf-agents (train_steps_per_iteration) hyperparameters.
             #
@@ -84,7 +84,7 @@ def train_with_replay_buffer_post_step(
             # an "apples-to-apples" comparison of the frameworks.
             # logger.info(f"TRAIN: num_steps % training_freq = 0, num_steps={_num_steps}, training_freq={training_freq}")
             for gradient_step in range(gradient_steps):
-                with rlscope_common.iml_prof_operation('train_step'):
+                with rlscope_common.rlscope_prof_operation('train_step'):
                     assert replay_buffer.size >= batch_size
                     train_batch = replay_buffer.sample_transition_batch(batch_size=batch_size)
                     preprocessed_batch = trainer_preprocessor(train_batch)

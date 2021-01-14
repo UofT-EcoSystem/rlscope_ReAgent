@@ -16,7 +16,7 @@ from reagent.gym.envs.env_wrapper import EnvWrapper
 from reagent.gym.types import Trajectory, Transition
 from reagent.tensorboardX import SummaryWriterContext
 
-import iml_profiler.api as iml
+import rlscope.api as rlscope
 from reagent.training import rlscope_common
 
 logger = logging.getLogger(__name__)
@@ -36,9 +36,9 @@ def run_episode(
     terminal = False
     num_steps = 0
     while not terminal:
-        with rlscope_common.iml_prof_operation('sample_action'):
+        with rlscope_common.rlscope_prof_operation('sample_action'):
             action, log_prob = agent.act(obs, possible_actions_mask)
-        with rlscope_common.iml_prof_operation('step'):
+        with rlscope_common.rlscope_prof_operation('step'):
             next_obs, reward, terminal, _ = env.step(action)
         next_possible_actions_mask = env.possible_actions_mask
         if max_steps is not None and num_steps >= max_steps:
@@ -55,7 +55,7 @@ def run_episode(
             log_prob=log_prob,
             possible_actions_mask=possible_actions_mask,
         )
-        # IML: NOTE: for TD3, this callback will perform gradient updates every train_freq simulator steps; see:
+        # RL-Scope: NOTE: for TD3, this callback will perform gradient updates every train_freq simulator steps; see:
         #   reagent/gym/agents/post_step.py: train_with_replay_buffer_post_step.post_step
         # So even though at a high-level it may looks like this code collects entire episodes before training, it DOESN'T.
         # i.e., this code matches the behaviour of the TD3 paper pseudocode (https://arxiv.org/pdf/1802.09477.pdf).

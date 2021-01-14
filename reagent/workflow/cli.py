@@ -16,7 +16,7 @@ import inspect
 import click
 from ruamel.yaml import YAML
 
-import iml_profiler.api as iml
+import rlscope.api as rlscope
 
 from reagent.training import rlscope_hyperparams
 
@@ -88,9 +88,9 @@ def wrap_pytorch():
         # logging.info(f"TYPE={type(value)}, name={name}, value={value}")
     logging.info(pprint.pformat(type_map))
 
-    from iml_profiler.profiler import log_stacktrace
-    from iml_profiler.profiler import wrap_util
-    from iml_profiler.profiler.log_stacktrace import LoggedStackTraces
+    from rlscope.profiler import log_stacktrace
+    from rlscope.profiler import wrap_util
+    from rlscope.profiler.log_stacktrace import LoggedStackTraces
     # import torch._C._nn
 
     LoggedStackTraces.wrap_module(torch._C)
@@ -112,7 +112,7 @@ def wrap_pytorch():
 @reagent.command(short_help="Run the workflow with config file")
 @click.argument("workflow")
 @click.argument("config_file", type=click.File("r"))
-@iml.click_add_arguments()
+@rlscope.click_add_arguments()
 def run(workflow, config_file, **kwargs):
 
     func, ConfigClass = _load_func_and_config_class(workflow)
@@ -132,8 +132,8 @@ def run(workflow, config_file, **kwargs):
     # Wrap AFTER @torch.jit.script runs to avoid messing up jit compiling
     # (I think wrapping torch.* messes up the type annotation information?)
     # wrap_pytorch()
-    from iml_profiler.profiler import clib_wrap as iml_clib_wrap
-    iml_clib_wrap.register_torch()
+    from rlscope.profiler import clib_wrap as rlscope_clib_wrap
+    rlscope_clib_wrap.register_torch()
 
     model = config.model.value
     model_name = model.__class__.__name__
@@ -147,15 +147,15 @@ def run(workflow, config_file, **kwargs):
     else:
         raise RuntimeError(f"Not sure what algo to use for model: {model_name}")
     env = config.env.value.env_name
-    iml.handle_click_iml_args(kwargs, directory=kwargs['iml_directory'], reports_progress=True)
-    iml.prof.set_metadata({
+    rlscope.handle_click_rlscope_args(kwargs, directory=kwargs['rlscope_directory'], reports_progress=True)
+    rlscope.prof.set_metadata({
         'algo': algo,
         'env': env,
     })
     process_name = f'{algo}_run'
     phase_name = process_name
 
-    with iml.prof.profile(process_name=process_name, phase_name=phase_name):
+    with rlscope.prof.profile(process_name=process_name, phase_name=phase_name):
         func(**config.asdict())
 
 
@@ -163,15 +163,15 @@ def run(workflow, config_file, **kwargs):
 @click.argument("workflow")
 @click.option("--algo", required=True)
 @click.option("--env", required=True)
-@iml.click_add_arguments()
+@rlscope.click_add_arguments()
 def run_stable_baselines(workflow, algo, env, **kwargs):
 
     config_dict = rlscope_hyperparams.load_stable_baselines_hyperparams(algo, env)
 
     func, ConfigClass = _load_func_and_config_class(workflow)
 
-    iml.handle_click_iml_args(kwargs, directory=kwargs['iml_directory'], reports_progress=True)
-    iml.prof.set_metadata({
+    rlscope.handle_click_rlscope_args(kwargs, directory=kwargs['rlscope_directory'], reports_progress=True)
+    rlscope.prof.set_metadata({
         'algo': algo,
         'env': env,
     })
@@ -179,7 +179,7 @@ def run_stable_baselines(workflow, algo, env, **kwargs):
     phase_name = process_name
 
     config_dict = select_relevant_params(config_dict, ConfigClass)
-    config_dict['log_dir'] = os.path.join(kwargs['iml_directory'], 'tensorboard_log_dir')
+    config_dict['log_dir'] = os.path.join(kwargs['rlscope_directory'], 'tensorboard_log_dir')
     logging.info("config:\n{msg}".format(msg=textwrap.indent(pprint.pformat(config_dict), prefix='  ')))
 
     # NOTE: This is when the algorithm gets instantiated.
@@ -188,10 +188,10 @@ def run_stable_baselines(workflow, algo, env, **kwargs):
     # Wrap AFTER @torch.jit.script runs to avoid messing up jit compiling
     # (I think wrapping torch.* messes up the type annotation information?)
     # wrap_pytorch()
-    from iml_profiler.profiler import clib_wrap as iml_clib_wrap
-    iml_clib_wrap.register_torch()
+    from rlscope.profiler import clib_wrap as rlscope_clib_wrap
+    rlscope_clib_wrap.register_torch()
 
-    with iml.prof.profile(process_name=process_name, phase_name=phase_name):
+    with rlscope.prof.profile(process_name=process_name, phase_name=phase_name):
         func(**config.asdict())
 
 
