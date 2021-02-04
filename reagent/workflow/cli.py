@@ -147,7 +147,7 @@ def run(workflow, config_file, **kwargs):
     else:
         raise RuntimeError(f"Not sure what algo to use for model: {model_name}")
     env = config.env.value.env_name
-    rlscope.handle_click_rlscope_args(kwargs, directory=kwargs['rlscope_directory'], reports_progress=True)
+    rlscope.handle_click_rlscope_args(kwargs, directory=kwargs['rlscope_directory'], reports_progress=True, delay=True, delay_register_libs=True)
     rlscope.prof.set_metadata({
         'algo': algo,
         'env': env,
@@ -170,7 +170,10 @@ def run_stable_baselines(workflow, algo, env, **kwargs):
 
     func, ConfigClass = _load_func_and_config_class(workflow)
 
-    rlscope.handle_click_rlscope_args(kwargs, directory=kwargs['rlscope_directory'], reports_progress=True)
+    # delay_register_libs=True
+    #   Wrap AFTER @torch.jit.script runs to avoid messing up jit compiling
+    #   (I think wrapping torch.* messes up the type annotation information?)
+    rlscope.handle_click_rlscope_args(kwargs, directory=kwargs['rlscope_directory'], reports_progress=True, delay=True, delay_register_libs=True)
     rlscope.prof.set_metadata({
         'algo': algo,
         'env': env,
@@ -185,11 +188,8 @@ def run_stable_baselines(workflow, algo, env, **kwargs):
     # NOTE: This is when the algorithm gets instantiated.
     config = ConfigClass(**config_dict)
 
-    # Wrap AFTER @torch.jit.script runs to avoid messing up jit compiling
-    # (I think wrapping torch.* messes up the type annotation information?)
-    # wrap_pytorch()
-    from rlscope.profiler import clib_wrap as rlscope_clib_wrap
-    rlscope_clib_wrap.register_torch()
+    # from rlscope.profiler import clib_wrap as rlscope_clib_wrap
+    # rlscope_clib_wrap.register_torch()
 
     with rlscope.prof.profile(process_name=process_name, phase_name=phase_name):
         func(**config.asdict())
